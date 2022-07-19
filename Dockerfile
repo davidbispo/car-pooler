@@ -1,12 +1,15 @@
-FROM alpine:3.8
+FROM ruby-3.1.2-slim
+RUN apt-get update -qq && apt-get install -y nodejs postgresql-client
 
-# This Dockerfile is optimized for go binaries, change it as much as necessary
-# for your language of choice.
+WORKDIR /app
+COPY Gemfile /app/Gemfile
+COPY Gemfile.lock /app/Gemfile.lock
+RUN bundle install
 
-RUN apk --no-cache add ca-certificates=20190108-r0 libc6-compat=1.1.19-r10
+COPY entrypoint.sh /usr/bin/
+RUN chmod +x /usr/bin/entrypoint.sh
+ENTRYPOINT ["entrypoint.sh"]
+EXPOSE 3000
 
-EXPOSE 9091
-
-COPY car-pooling-challenge /
- 
-ENTRYPOINT [ "/car-pooling-challenge" ]
+# Configure the main process to run when running the image
+CMD ["rails", "server", "-b", "0.0.0.0"]
