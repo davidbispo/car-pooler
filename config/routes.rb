@@ -1,4 +1,10 @@
 Rails.application.routes.draw do
-  # For details on the DSL available within this file, see https://guides.rubyonrails.org/routing.html
-  get 'status' => 'status#index'  
+  get 'status' => 'status#index'
+  
+  put 'cars/:id' => 'cars#upsert'
+  put 'cars/' => 'cars#upsert'
+
+  put 'journey' => 'journeys#upsert'  
+  post 'dropoff' => 'journeys#finish'
+  post 'locate' => 'journeys#locate'  
 end
