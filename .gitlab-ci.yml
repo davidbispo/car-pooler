@@ -6,6 +6,11 @@ stages:
 ## Uncomment the following sections to enable docker, image building and
 ## acceptance
 
+build:
+ stage: build
+ script:
+   - docker system prune -f
+
 build_image:
   stage: docker
   image: docker:latest
@@ -15,9 +20,7 @@ build_image:
     DOCKER_HOST: tcp://docker:2375/
   services:
     - docker:dind
-    - mysql
   script:
-    - docker image prune
     - echo ${CI_JOB_TOKEN} | docker login --password-stdin -u ${CI_REGISTRY_USER} ${CI_REGISTRY}
     - docker build . -t ${CI_REGISTRY_IMAGE}:latest
     - docker push ${CI_REGISTRY_IMAGE}:latest
