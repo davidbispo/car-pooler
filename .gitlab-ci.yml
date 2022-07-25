@@ -1,5 +1,6 @@
 ---
 stages:
+  - build
   - docker
   - acceptance
 
@@ -7,7 +8,6 @@ stages:
 ## acceptance
 
 build:
- stage: build
  script:
    - docker system prune -f
 
