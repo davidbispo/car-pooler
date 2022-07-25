@@ -17,6 +17,7 @@ build_image:
     - docker:dind
     - mysql
   script:
+    - docker image prune
     - echo ${CI_JOB_TOKEN} | docker login --password-stdin -u ${CI_REGISTRY_USER} ${CI_REGISTRY}
     - docker build . -t ${CI_REGISTRY_IMAGE}:latest
     - docker push ${CI_REGISTRY_IMAGE}:latest
