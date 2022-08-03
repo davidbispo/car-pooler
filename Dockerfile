@@ -8,4 +8,4 @@ RUN gem install bundler
 RUN bundle install
 COPY . .
 EXPOSE 9091
-CMD ["bundle", "exec", "rackup", "-d", "-p", "9091", "-o", "0.0.0.0"]
+CMD ["bundle", "exec", "puma", "-p", "9091", "-e", "production"]
