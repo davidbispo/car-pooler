@@ -1,12 +1,10 @@
-FROM ruby:3.1.2-slim
-RUN apt-get update -qq && apt-get install -y build-essential libpq-dev nodejs libsqlite3-dev
+FROM ruby:3.0.4
 
 RUN mkdir /app
 WORKDIR /app
-COPY Gemfile /app/Gemfile
-COPY Gemfile.lock /app/Gemfile.lock
-RUN bundle install
 
+COPY Gemfile Gemfile.lock ./
+RUN gem install bundler
+RUN bundle install
 COPY . .
-RUN chmod +x /app/entrypoint.sh
-ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["bundle", "exec", "rackup", "-d", "-p", "9292", "-o", "0.0.0.0"]
