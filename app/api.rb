@@ -26,12 +26,12 @@ module CarPooling
       return { status: "ok" }.to_json
     end
 
-    get '/cars' do
-      render_json(200, Car.all.to_json)
-    end
+    # get '/cars' do
+    #   render_json(200, Car.all.to_json)
+    # end
 
     put '/cars' do
-      return status 400 if !@request.content_type == 'application/json'
+      return status 400 if @request.content_type != 'application/json'
       @request.body.rewind
       @request_payload = JSON.parse(request.body.read) rescue nil
 
@@ -44,7 +44,7 @@ module CarPooling
     end
 
     post '/journey' do
-      return status 400 if !@request.content_type == 'application/json'
+      return status 400 if @request.content_type != 'application/json'
       @request.body.rewind
       @request_payload = JSON.parse(request.body.read) rescue nil
 
@@ -55,11 +55,10 @@ module CarPooling
         seats:@request_payload['people']
       )
       status 200
-      # render_json(200, { car_id: result }.to_json)
     end
 
     post '/dropoff' do
-      return status 400 if !@request.content_type == 'application/x-www-form-urlencoded'
+      return status 400 if @request.content_type != 'application/x-www-form-urlencoded'
       waiting_group_id = params[:ID].to_i rescue nil
       return status 400 if waiting_group_id.nil?
 
@@ -69,7 +68,7 @@ module CarPooling
     end
 
     post '/locate' do
-      return status 400 if !@request.content_type == 'application/x-www-form-urlencoded'
+      return status 400 if @request.content_type != 'application/x-www-form-urlencoded'
       waiting_group_id = params[:ID].to_i rescue nil
       return status 400 if  waiting_group_id.nil?
 
@@ -85,9 +84,9 @@ module CarPooling
       render_json(200, result.to_json)
     end
 
-    get '/journeys' do
-      render_json(200, Journey.all.to_json)
-    end
+    # get '/journeys' do
+    #   render_json(200, Journey.all.to_json)
+    # end
 
     private
 
