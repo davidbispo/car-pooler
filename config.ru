@@ -1,6 +1,3 @@
-# This file is used by Rack-based servers to start the application.
-
-require_relative "config/environment"
-
-run Rails.application
-Rails.application.load_server
+PROJECT_ROOT = Dir.pwd
+Dir[File.join(__dir__, 'app', '**', '*.rb')].each { |file| require_relative file }
+run CarPooling::API.new
