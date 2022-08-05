@@ -1,6 +1,8 @@
+require_relative '../../spec_helper'
 require_relative "../../../app/api"
 require_relative '../../../app/models/journey'
 require_relative '../../../app/models/car'
+require_relative '../../../app/lib/car_pooling_queue'
 
 RSpec.describe 'POST /cars: create cars' do
   def app
@@ -34,7 +36,7 @@ RSpec.describe 'POST /cars: create cars' do
     context 'when cars exist' do
       before do
         Car.destroy_all
-        @existing_car = Car.create(id: 1, seats: 4)
+        @existing_car = Car.create(id: 3, seats: 5)
         put("/cars", payload.to_json, { 'CONTENT_TYPE' => 'application/json' })
       end
 
