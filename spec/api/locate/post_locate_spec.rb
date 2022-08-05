@@ -29,7 +29,7 @@ RSpec.describe 'POST /locate: Locate journey' do
         end
 
         it 'expects a 404' do
-          expect(last_response.status).to eq(404)
+          expect(last_response.status).to eq(204)
         end
       end
 

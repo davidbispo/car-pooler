@@ -1,4 +1,3 @@
-require 'concurrent'
 require_relative '../models/car'
 
 class CarPoolingQueue
@@ -7,29 +6,20 @@ class CarPoolingQueue
   @@queue = Concurrent::Hash.new
   @@queue_status = 'stopped'
 
-  def self.add_to_queue(waiting_group_id:, seats:)
+  def add_to_queue(waiting_group_id:, seats:)
     @@queue[waiting_group_id] = seats
   end
 
-  def self.remove_from_queue(waiting_group_id:)
+  def remove_from_queue(waiting_group_id:)
     @@queue.delete(waiting_group_id)
   end
 
-  def self.clear_queue
+  def clear_queue
     @@queue = Concurrent::Hash.new
   end
 
   def self.waiting_group_in_queue?(waiting_group_id)
-    @@queue.key?(waiting_group_id)
-  end
-
-  def self.consume_queue
-    puts "consuming"
-    @@queue.each do |waiting_group_id, people|
-      car = Car.find_by_seats(seats: people)
-      next unless car
-      notify_car_found(waiting_group_id: waiting_group_id, car_id: car[:id])
-    end
+    get_queue.key?(waiting_group_id)
   end
 
   def self.get_queue
@@ -38,10 +28,6 @@ class CarPoolingQueue
 
   def get_queue_status
     @@queue_status
-  end
-
-  def set_queue_status(status:)
-    @@queue_status = status
   end
 
   def start(execution_interval: 5)
@@ -54,6 +40,12 @@ class CarPoolingQueue
     timer_task_instance.shutdown
   end
 
+  private
+
+  def set_queue_status(status:)
+    @@queue_status = status
+  end
+
   def timer_task_instance(execution_interval: 0.1)
     @timer_task_instance ||= Concurrent::TimerTask.new(run_now: true, execution_interval: execution_interval) do
       CarPoolingQueue.consume_queue
@@ -63,7 +55,19 @@ class CarPoolingQueue
   def self.notify_car_found(waiting_group_id:, car_id:)
     CarReadyNotification.notify(waiting_group_id:waiting_group_id, car_id:car_id)
   end
+
+  def self.consume_queue
+    puts "consuming"
+    mutex = Mutex.new
+    @@queue.each do |waiting_group_id, people|
+      mutex.lock
+      car = Car.find_by_seats(seats: people)
+      next unless car
+      notify_car_found(waiting_group_id: waiting_group_id, car_id: car[:id])
+      mutex.unlock
+    end
+  end
 end
 
 CarPoolingQueueProcess = CarPoolingQueue.new
-CarPoolingQueueProcess.start unless ENV['RACK_ENV'] == 'test'
+CarPoolingQueueProcess.start(execution_interval: 0.1) unless ENV['RACK_ENV'] == 'test'
