@@ -3,7 +3,6 @@ require_relative './lib/application_helper'
 
 module CarPooling
   class API < Sinatra::Base
-
     include ApplicationHelper
 
     set :server, 'puma'
@@ -19,10 +18,7 @@ module CarPooling
     end
 
     before do
-      if @request.content_type == 'application/json'
-        @request.body.rewind
-        @request_payload = JSON.parse(request.body.read) rescue nil
-      end
+      parse_json unless @request.content_type != 'application/json'
     end
 
     get '/status' do
@@ -35,15 +31,14 @@ module CarPooling
     patch '/cars' do return status 400 end
     delete '/cars' do return status 400 end
     put '/cars' do
-      return status 400 if @request.content_type != 'application/json'
-      @request.body.rewind
-      @request_payload = JSON.parse(request.body.read) rescue nil
+      return status 400 if invalid_json_header
+      cars = @json_payload
 
-      return status 400 if !@request_payload
-      return status 400 unless validate_cars_for_bulk(@request_payload)
+      return status 400 if !cars
+      return status 400 unless validate_cars_for_bulk(cars)
 
       reset_application
-      Car.insert_all(@request_payload)
+      Car.insert_all(cars)
       status 200
     end
 
@@ -52,18 +47,16 @@ module CarPooling
     patch '/journey' do return status 400 end
     delete '/journey' do return status 400 end
     post '/journey' do
-      return status 400 if @request.content_type != 'application/json'
-      @request.body.rewind
-      @request_payload = JSON.parse(request.body.read) rescue nil
+      return status 400 if invalid_json_header
+      journey = @json_payload
+      return status 400 if !journey
 
-      return status 400 if !@request_payload
-
-      valid_journey = validate_journey(@request_payload)
+      valid_journey = validate_journey(journey)
       return status 400 unless valid_journey
 
       Journey.find_journey(
-        waiting_group_id:@request_payload['id'],
-        seats:@request_payload['people']
+        waiting_group_id:journey['id'],
+        seats:journey['people']
       )
       status 200
     end
@@ -73,9 +66,8 @@ module CarPooling
     patch '/dropoff' do return status 400 end
     delete '/dropoff' do return status 400 end
     post '/dropoff' do
-      return status 400 if @request.content_type != 'application/x-www-form-urlencoded'
-      waiting_group_id_valid = validate_id(params[:ID]) rescue nil
-      return status 400 if !waiting_group_id_valid
+      return status 400 if invalid_www_form_header
+      return status 400 if !waiting_group_id_valid?
 
       waiting_group_id = params[:ID].to_i rescue nil
       return status 400 if waiting_group_id.nil?
@@ -90,12 +82,11 @@ module CarPooling
     patch '/locate' do return status 400 end
     delete '/locate' do return status 400 end
     post '/locate' do
-      return status 400 if @request.content_type != 'application/x-www-form-urlencoded'
-      waiting_group_id_valid = validate_id(params[:ID]) rescue nil
-      return status 400 if !waiting_group_id_valid
+      return status 400 if invalid_www_form_header
+      return status 400 if !waiting_group_id_valid?
 
       waiting_group_id = params[:ID].to_i rescue nil
-      return status 400 if waiting_group_id.nil? || !waiting_group_id_valid
+      return status 400 if waiting_group_id.nil? || !waiting_group_id_valid?
 
       journey = Journey.locate_journey(waiting_group_id)
 
@@ -107,40 +98,6 @@ module CarPooling
         seats: journey[:seats]
       }
       render_json(200, result.to_json)
-    end
-
-    private
-
-    def validate_cars_for_bulk(cars)
-      invalid_input = cars.any? do |car|
-        car[:id].class != Integer || car[:seats].class != Integer
-      end
-      return invalid_input if invalid_input
-      true
-    end
-
-    def validate_journey(journey)
-      journey['id'].is_a?(Numeric) && journey['people'].is_a?(Numeric)
-    end
-
-    def validate_id(id)
-      id.match?(/\d*/)
-    end
-
-
-    def is_integer(value)
-      value.to_s.matches?(/\A[-+]?[0-9]+\z/)
-    end
-
-    def render_not_found
-      return "Not Found"
-      status 404
-    end
-
-    def render_json(status, json)
-      content_type 'application/json'
-      status(status)
-      return json
     end
   end
 end
