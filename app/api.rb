@@ -30,6 +30,10 @@ module CarPooling
       return { status: "ok" }.to_json
     end
 
+    get '/cars' do return status 400 end
+    post '/cars' do return status 400 end
+    patch '/cars' do return status 400 end
+    delete '/cars' do return status 400 end
     put '/cars' do
       return status 400 if @request.content_type != 'application/json'
       @request.body.rewind
@@ -43,6 +47,10 @@ module CarPooling
       status 200
     end
 
+    get '/journey' do return status 400 end
+    put '/journey' do return status 400 end
+    patch '/journey' do return status 400 end
+    delete '/journey' do return status 400 end
     post '/journey' do
       return status 400 if @request.content_type != 'application/json'
       @request.body.rewind
@@ -60,6 +68,10 @@ module CarPooling
       status 200
     end
 
+    get '/dropoff' do return status 400 end
+    put '/dropoff' do return status 400 end
+    patch '/dropoff' do return status 400 end
+    delete '/dropoff' do return status 400 end
     post '/dropoff' do
       return status 400 if @request.content_type != 'application/x-www-form-urlencoded'
       waiting_group_id_valid = validate_id(params[:ID]) rescue nil
@@ -73,6 +85,10 @@ module CarPooling
       status 200
     end
 
+    get '/locate' do return status 400 end
+    put '/locate' do return status 400 end
+    patch '/locate' do return status 400 end
+    delete '/locate' do return status 400 end
     post '/locate' do
       return status 400 if @request.content_type != 'application/x-www-form-urlencoded'
       waiting_group_id_valid = validate_id(params[:ID]) rescue nil
