@@ -15,6 +15,10 @@ class CarPoolingQueue
     @@queue.delete(waiting_group_id)
   end
 
+  def self.clear_queue
+    @@queue = Concurrent::Hash.new
+  end
+
   def self.waiting_group_in_queue?(waiting_group_id)
     @@queue.key?(waiting_group_id)
   end
@@ -25,7 +29,6 @@ class CarPoolingQueue
       car = Car.find_by_seats(seats: people)
       next unless car
       notify_car_found(waiting_group_id: waiting_group_id, car_id: car[:id])
-      remove_from_queue(waiting_group_id:waiting_group_id)
     end
   end
 
@@ -41,9 +44,9 @@ class CarPoolingQueue
     @@queue_status = status
   end
 
-  def start
+  def start(execution_interval: 5)
     set_queue_status(status: 'started')
-    timer_task_instance.execute
+    timer_task_instance(execution_interval: execution_interval).execute
   end
 
   def stop
@@ -51,8 +54,8 @@ class CarPoolingQueue
     timer_task_instance.shutdown
   end
 
-  def timer_task_instance
-    @timer_task_instance ||= Concurrent::TimerTask.new(run_now: true, execution_interval:5) do
+  def timer_task_instance(execution_interval: 0.1)
+    @timer_task_instance ||= Concurrent::TimerTask.new(run_now: true, execution_interval: execution_interval) do
       CarPoolingQueue.consume_queue
     end
   end

@@ -5,11 +5,17 @@ class Journey
     @@journeys
   end
 
-  def self.find_car_id(waiting_group_id:)
+  def self.find_by_waiting_group_id(waiting_group_id)
     @@journeys[waiting_group_id]
   end
 
-  def self.create_journey(waiting_group_id:, seats:)
+  def self.create(waiting_group_id:, car_id:, seats:)
+    entity = { car_id: car_id, seats:seats }
+    @@journeys[waiting_group_id] = entity
+    entity
+  end
+
+  def self.find_journey(waiting_group_id:, seats:)
     CarPoolingQueue.add_to_queue(waiting_group_id: waiting_group_id, seats: seats)
     notified = false
     while not notified
@@ -18,7 +24,8 @@ class Journey
       sleep 0.5 unless car_id
     end
 
-    @@journeys[waiting_group_id] = { car_id: car_id, seats:seats }
+    CarPoolingQueue.remove_from_queue(waiting_group_id:waiting_group_id)
+    Journey.create(waiting_group_id:waiting_group_id, car_id:car_id, seats:seats)
     car = Car.find(car_id)
     car[:seats] -= seats
     return car_id
@@ -30,7 +37,7 @@ class Journey
   end
 
   def self.finish_journey(waiting_group_id:)
-    car = Journey.find_car_id(waiting_group_id: waiting_group_id)
+    car = Journey.find_by_waiting_group_id(waiting_group_id)
     return 'not found' unless car
     car = Car.find(car[:car_id])
     car[:seats] += 2

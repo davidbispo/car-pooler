@@ -1,7 +1,11 @@
 require 'sinatra/base'
+require_relative './lib/application_helper'
 
 module CarPooling
   class API < Sinatra::Base
+
+    include ApplicationHelper
+
     set :server, 'puma'
     require 'json'
     require "sinatra/config_file"
@@ -26,10 +30,6 @@ module CarPooling
       return { status: "ok" }.to_json
     end
 
-    # get '/cars' do
-    #   render_json(200, Car.all.to_json)
-    # end
-
     put '/cars' do
       return status 400 if @request.content_type != 'application/json'
       @request.body.rewind
@@ -38,8 +38,8 @@ module CarPooling
       return status 400 if !@request_payload
       return status 400 unless validate_cars_for_bulk(@request_payload)
 
-      Journey.destroy_all
-      Car.reset_cars(cars:@request_payload)
+      reset_application
+      Car.insert_all(@request_payload)
       status 200
     end
 
@@ -50,7 +50,10 @@ module CarPooling
 
       return status 400 if !@request_payload
 
-      Journey.create_journey(
+      valid_journey = validate_journey(@request_payload)
+      return status 400 unless valid_journey
+
+      Journey.find_journey(
         waiting_group_id:@request_payload['id'],
         seats:@request_payload['people']
       )
@@ -59,18 +62,24 @@ module CarPooling
 
     post '/dropoff' do
       return status 400 if @request.content_type != 'application/x-www-form-urlencoded'
+      waiting_group_id_valid = validate_id(params[:ID]) rescue nil
+      return status 400 if !waiting_group_id_valid
+
       waiting_group_id = params[:ID].to_i rescue nil
       return status 400 if waiting_group_id.nil?
 
       result = Journey.finish_journey(waiting_group_id: waiting_group_id)
-      return status 404 if result != 'not found'
+      return status 404 if result == 'not found'
       status 200
     end
 
     post '/locate' do
       return status 400 if @request.content_type != 'application/x-www-form-urlencoded'
+      waiting_group_id_valid = validate_id(params[:ID]) rescue nil
+      return status 400 if !waiting_group_id_valid
+
       waiting_group_id = params[:ID].to_i rescue nil
-      return status 400 if  waiting_group_id.nil?
+      return status 400 if waiting_group_id.nil? || !waiting_group_id_valid
 
       journey = Journey.locate_journey(waiting_group_id)
 
@@ -84,10 +93,6 @@ module CarPooling
       render_json(200, result.to_json)
     end
 
-    # get '/journeys' do
-    #   render_json(200, Journey.all.to_json)
-    # end
-
     private
 
     def validate_cars_for_bulk(cars)
@@ -97,6 +102,15 @@ module CarPooling
       return invalid_input if invalid_input
       true
     end
+
+    def validate_journey(journey)
+      journey['id'].is_a?(Numeric) && journey['people'].is_a?(Numeric)
+    end
+
+    def validate_id(id)
+      id.match?(/\d*/)
+    end
+
 
     def is_integer(value)
       value.to_s.matches?(/\A[-+]?[0-9]+\z/)
