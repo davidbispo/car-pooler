@@ -2,6 +2,7 @@ require_relative '../../spec_helper'
 require_relative '../../../app/api'
 require_relative '../../../app/models/journey'
 require_relative '../../../app/lib/car_pooling_queue'
+require_relative '../../../app/services/locate_journey_service'
 
 RSpec.describe 'POST /locate: Locate journey' do
   def app

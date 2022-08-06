@@ -5,6 +5,7 @@ require_relative '../../../app/models/journey'
 require_relative '../../../app/models/car_ready_notification'
 require_relative '../../../app/lib/car_pooling_queue'
 require_relative '../../../app/lib/application_helper'
+require_relative '../../../app/services/finish_journey_service'
 
 RSpec.describe 'POST /dropoff: finish journey' do
   def app

@@ -3,6 +3,8 @@ require_relative '../../../app/api'
 require_relative '../../../app/models/journey'
 require_relative '../../../app/lib/car_pooling_queue'
 require_relative '../../../app/models/car_ready_notification'
+require_relative '../../../app/services/create_journey_service'
+require_relative '../../../app/services/locate_journey_service'
 
 RSpec.describe 'POST /journeys: Create journey' do
   def app
@@ -34,7 +36,7 @@ RSpec.describe 'POST /journeys: Create journey' do
         end
 
         it 'expects a that a journey has been successfully registered' do
-          expect(Journey.locate_journey(payload[:id])).to eq({ :car_id => 1, :seats => 4 })
+          expect(LocateJourneyService.perform(payload[:id])).to eq({ :id => 1, :seats => 4 })
         end
       end
     end
