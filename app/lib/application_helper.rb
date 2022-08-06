@@ -7,11 +7,9 @@ module ApplicationHelper
 
   #validate parameter inputs
   def validate_cars_for_bulk(cars)
-    invalid_input = cars.any? do |car|
-      car[:id].class != Integer || car[:seats].class != Integer
+    cars.all? do |car|
+      car["id"].class == Integer || car["seats"].class == Integer
     end
-    return invalid_input if invalid_input
-    true
   end
 
   def validate_journey(journey)
@@ -55,5 +53,9 @@ module ApplicationHelper
     content_type 'application/json'
     status(status)
     return json
+  end
+
+  def get_argument_from_form(arg)
+    params[arg].to_i rescue nil
   end
 end
