@@ -50,8 +50,19 @@ class CarPoolingQueue
 
   def timer_task_instance(execution_interval: 0.1)
     @timer_task_instance ||= Concurrent::TimerTask.new(run_now: true, execution_interval: execution_interval) do
-      CarPoolingQueue.consume_queue
+      unless get_scheduled_task && get_scheduled_task.state == 'pending'
+      set_scheduled_task
+      get_scheduled_task.execute
+      end
     end
+  end
+
+  def get_scheduled_task
+    @scheduled_task
+  end
+
+  def set_scheduled_task
+    @scheduled_task = Concurrent::ScheduledTask.execute(0) { CarPoolingQueue.consume_queue }
   end
 
   def self.notify_car_found(waiting_group_id:, car_id:)
