@@ -1,3 +1,68 @@
+## SOLUTION - See Challenge Proposal below
+
+### 1. Tooling basics
+This Car Pooling API solution is built in Ruby. It uses Sinatra as gateway,
+delegating requests to pure Ruby classes. Data storage is performed
+using thread-safe class variables. 
+
+The application is served using puma(multi-threaded Ruby server) to 
+take advantage of simultaneous connections and multi-thread computing.
+
+### 2. Serving cars
+Journeys can be created via request and are managed by a queue. Once
+a car is requested, the requested posts to a CarPooling queue. This 
+request attempts to find a CarFoundNotification for the waiting group.
+This notification contains the car_id assigned for the trip
+
+Once the waiting request detects that a car has been found for 
+that waiting group, it atomically registers the journey and returns
+the a 200 status.
+
+### 3. The CarPolling queue
+The queue runs as concurrent a scheduled task that periodically loops
+through the queue, finds cars and notifies the awaiting requesters.
+
+The concurrency pattern is implemented by concurrent-ruby.
+
+It serves cars on a first-come first-serve order. Once the consumer
+starts, it assigns cars to customers in order. However, it would
+not be fair for example, to await car assignment to serve a 6-people 
+waiting group and leave other customers waiting. As a workaround,
+the queue stores unassigned cars and retries them at each waiting
+group so they get prioritized and don't have to wait too much
+
+### 4. Thread-safety
+Thread-safety is achieved by using thread-synced variables implemented
+by concurrent-ruby. Atomic transactions are performed using Mutual
+Exclusion(Mutex) locks.
+
+### 4. Rationale behind the solution
+As the first boundary condition, no databases are allowed. Hence
+storage must be done into the process memory or using a file-based
+approach. Since a file-based solution would require loading data
+into the memory anyway, I stuck with using class variables.
+One of the key points was data storage using key pointers(hashes) 
+instead of indexes(arrays).
+
+The second boundary condition is serving customers by arrival order.
+This means that we need something to happen continuously and assign
+cars to customers in order. This something is a scheduled stask which 
+re-schedules itself, which loops through each element, finds cars
+and posts notifications to waiting customers.
+
+Rack-based applications, such as Sinatra, tipically serve using
+multiple threads. Ruby threads are allowed to wait and each process
+could range up to 200/300 simultaneous threads.
+
+Ruby is my primary language. The language implements a Global
+Interpreter lock, allowing concurrent but not parallel execution.
+
+Ruby implements native threading. However, thread-safe code
+is rather(according to my research) difficult and lacks of implementation 
+standards(i.e.: Promises, ScheduledTasks, TimerTasks, etc...). Hence I used
+the concurrent-ruby gem.
+
+
 # Car Pooling Service Challenge
 
 Design/implement a system to manage car pooling.
@@ -218,3 +283,5 @@ following survey:
 - https://forms.gle/EzPeURspTCLG1q9T7
 
 Your participation is really important. Thanks for your contribution!
+
+

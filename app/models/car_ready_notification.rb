@@ -1,5 +1,5 @@
 class CarReadyNotification
-  @@notifications = {}
+  @@notifications = Concurrent::Hash.new
 
   def self.get_all_notifications
     @@notifications
