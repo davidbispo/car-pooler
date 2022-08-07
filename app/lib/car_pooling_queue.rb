@@ -4,6 +4,8 @@ class CarPoolingQueue
   QUEUE_STATUSES = %w(stopped, started)
 
   @@queue = Concurrent::Hash.new
+  @@skipped = Concurrent::Hash.new
+
   @@queue_status = 'stopped'
 
   def add_to_queue(waiting_group_id:, seats:)
@@ -56,13 +58,28 @@ class CarPoolingQueue
     CarReadyNotification.notify(waiting_group_id:waiting_group_id, car_id:car_id)
   end
 
-  def self.consume_queue
-    puts "consuming"
+  def self.retry_skipped
     mutex = Mutex.new
-    @@queue.each do |waiting_group_id, people|
+    @@skipped.each do |waiting_group_id, people|
       mutex.lock
       car = Car.find_by_seats(seats: people)
-      next unless car
+      if car
+        @@skipped.delete(waiting_group_id)
+        notify_car_found(waiting_group_id: waiting_group_id, car_id: car[:id])
+      end
+      mutex.unlock
+    end
+  end
+
+  def self.consume_queue
+    mutex = Mutex.new
+    @@queue.each do |waiting_group_id, people|
+      retry_skipped
+      mutex.lock
+      car = Car.find_by_seats(seats: people)
+      unless car
+        @@skipped[waiting_group_id] = people
+      end
       notify_car_found(waiting_group_id: waiting_group_id, car_id: car[:id])
       mutex.unlock
     end

@@ -8,6 +8,12 @@ using thread-safe class variables.
 The application is served using puma(multi-threaded Ruby server) to 
 take advantage of simultaneous connections and multi-thread computing.
 
+We leverage those tools to create two roles: (i) the journey requester,
+which performs a request that can wait and (ii) the journey finder,
+which takes care of finding journeys but not demanding trip resolving
+in order before the next ones, but at the same time not leaving 
+unresolved trips unattended.
+
 ### 2. Serving cars
 Journeys can be created via request and are managed by a queue. Once
 a car is requested, the requested posts to a CarPooling queue. This 
@@ -24,25 +30,34 @@ through the queue, finds cars and notifies the awaiting requesters.
 
 The concurrency pattern is implemented by concurrent-ruby.
 
-It serves cars on a first-come first-serve order. Once the consumer
-starts, it assigns cars to customers in order. However, it would
-not be fair for example, to await car assignment to serve a 6-people 
-waiting group and leave other customers waiting. As a workaround,
-the queue stores unassigned cars and retries them at each waiting
-group so they get prioritized and don't have to wait too much
+It serves cars on a first-come first-serve(FCFS) order. Once the 
+consumer starts, it assigns cars to customers in order of arrival. 
+
+It would not be fair for example, to await car assignment to 
+serve a 6-people waiting group and leave other customers waiting. 
+As a workaround, the queue stores unassigned cars and retries 
+them at each waiting group iteration so they get higher priority
+and don't have to wait for another queue cycle to start.
+
+Cars are served until they are full. Cars are served to customers
+FSFS using optimal fit first: we can't fit 4 people in a car with 
+2-seats. since the opposite is true, makes sense to always fit larger
+groups in larger cars. If we can't find an exact fit we find a larger
+car.
 
 ### 4. Thread-safety
 Thread-safety is achieved by using thread-synced variables implemented
 by concurrent-ruby. Atomic transactions are performed using Mutual
 Exclusion(Mutex) locks.
 
-### 4. Rationale behind the solution
+### 4. Rationale behind the tooling/solution
 As the first boundary condition, no databases are allowed. Hence
 storage must be done into the process memory or using a file-based
 approach. Since a file-based solution would require loading data
-into the memory anyway, I stuck with using class variables.
+into the memory anyway, class variables were selected.
 One of the key points was data storage using key pointers(hashes) 
-instead of indexes(arrays).
+instead of indexes(arrays) unless no other choice was possible, 
+mainly to avoid array-looping operations.
 
 The second boundary condition is serving customers by arrival order.
 This means that we need something to happen continuously and assign
@@ -62,6 +77,12 @@ is rather(according to my research) difficult and lacks of implementation
 standards(i.e.: Promises, ScheduledTasks, TimerTasks, etc...). Hence I used
 the concurrent-ruby gem.
 
+By coupling multithreaded requests that can wait and be resolved
+somehow and a class that acts as a journey finder we can provide:
+(i)trips in order, (ii)prevent the journey finder to keep finding 
+trips if a waiting group still does not have a car available,
+(iii)prevent the customer from being waiting and not getting his
+request periodically checked.
 
 # Car Pooling Service Challenge
 
