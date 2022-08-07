@@ -31,8 +31,17 @@ class Car
     @@cars = ::Concurrent::Array.new
   end
 
+  def self.exact_find_by_seats(seats:)
+    @@cars.find { |car| car[:seats] == seats }
+  end
+
   def self.find_by_seats(seats:)
-    @@cars.find { |car| car[:seats] >= seats }
+    #TODO: This method calls for optimization. We should have cars sorted by seats(i..e.: indexed somehow, just like
+    # we dould do with a database. Searches in a real DB could be much better and include conditions like finding
+    # the car with the smallest Car.last_idle_at value in order to reduce driver idle time.)
+    exact_find = exact_find_by_seats(seats:seats)
+    return exact_find if exact_find
+    @@cars.find { |car| car[:seats] > seats }
   end
 
   def self.find(id)
