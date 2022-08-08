@@ -21,35 +21,35 @@ operations.
 ### 2. Serving cars
 Journeys can be created via request and are managed by a queue. Once
 a car is requested, the requested posts to a CarPoolingQueue. The request 
-request then sleeps and keeps trying to finding a CarFoundNotification 
+then sleeps and keeps trying to find a CarFoundNotification 
 for the waiting group. This notification contains a car_id that may carry out 
 the trip.
 
 Once the waiting request detects that a car has been found for 
-that waiting group, it atomically registers the journey, subtracts
-car seats from the assigned car, removes the notification and 
+that waiting group, it atomically registers the journey, subtracts the number
+of seats from the assigned car, removes the notification and 
 returns a 200 status.
 
 ### 3. The CarPolling queue
 The queue runs concurrently as a scheduled task, that periodically loops
 through the queue, finds cars, and notifies the awaiting requesters.
 
-It serves cars on a first-come first-serve(FCFS) order. Once the 
+It serves cars on a first-come-first-serve(FCFS) order. Once the 
 consumer starts, it assigns cars to customers in order of 
 arrival(i.e.: it loops through the queue). 
 
 However, it would not be fair for example within a queue context, 
-for every customer to need to be server before the next, since we don't
+for every customer to need to be served before the next, since we don't
 know how long that could take. As a workaround, the queue stores and skips 
 unresolved waiting groups, retrying them before attempting to solve the 
 next waiting groups, so they get prioritized and don't have to wait for 
 another queue cycle to start to get a journey registered.
 
 Cars are served until they are full(i.e.: until no more sits are available). 
-Cars are served to customers FSFS using optimal fit first:we can't fit 4 
-people in a car with 2-seats. since the opposite is true, makes sense to always fit larger
-groups in the largest possible cars. If we can't find an exact fit we find a 
-larger car.
+Cars are served to customers FSFS using optimal fit first: we can't fit 4 
+people in a car with 2-seats. Since the opposite is true, makes sense to try
+to fit groups in the largest possible cars and generate the most journeys 
+possible. If we can't find an exact fit, we find a larger car.
 
 ### 4. Thread-safety
 Thread safety is achieved by using Thread-synced(i.e.: Thread-safe) variables 
@@ -72,7 +72,7 @@ ScheduledTask, scheduled for immediate execution. This task runs
 in a separate Thread, and will loop through the queue, find cars and 
 post notifications to waiting customers. We use two main abstractions for 
 encapsulation: one for queue state(TimerTask - kinda like a daemon) 
-and another queue execution(ScheduledTask).
+and another for queue execution(ScheduledTask).
 
 Rack-based applications, such as Sinatra, typically serve using
 multiple threads. Since Ruby threads are allowed to wait and each process
