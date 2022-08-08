@@ -90,10 +90,12 @@ class CarPoolingQueue
       car = Car.find_by_seats(seats: people)
       unless car
         @@skipped[waiting_group_id] = people
+        next
       end
       notify_car_found(waiting_group_id: waiting_group_id, car_id: car[:id])
       mutex.unlock
     end
+    @@skipped = Concurrent::Hash.new
   end
 end
 
