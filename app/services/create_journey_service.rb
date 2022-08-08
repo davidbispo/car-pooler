@@ -11,7 +11,6 @@ class CreateJourneyService
 
     mutex.lock
     CarReadyNotification.acknowledge_read(waiting_group_id:waiting_group_id)
-    CarPoolingQueueProcess.remove_from_queue(waiting_group_id:waiting_group_id)
     Journey.create(waiting_group_id:waiting_group_id, car_id:car_id, seats:seats)
     car = Car.find(car_id)
     car[:seats] -= seats

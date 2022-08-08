@@ -12,7 +12,7 @@ class CarPoolingQueue
     @@queue[waiting_group_id] = seats
   end
 
-  def remove_from_queue(waiting_group_id:)
+  def self.remove_from_queue(waiting_group_id:)
     @@queue.delete(waiting_group_id)
   end
 
@@ -93,6 +93,7 @@ class CarPoolingQueue
         next
       end
       notify_car_found(waiting_group_id: waiting_group_id, car_id: car[:id])
+      remove_from_queue(waiting_group_id:waiting_group_id)
       mutex.unlock
     end
     @@skipped = Concurrent::Hash.new
