@@ -5,8 +5,8 @@ class CarReadyNotification
     @@notifications
   end
 
-  def self.notify(waiting_group_id:, car_id:)
-    @@notifications[waiting_group_id] = car_id
+  def self.notify(waiting_group_id:, car:)
+    @@notifications[waiting_group_id] = car
   end
 
   def self.acknowledge_read(waiting_group_id:)

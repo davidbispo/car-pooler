@@ -11,7 +11,7 @@ module CarPooling
       return { status: "ok" }.to_json
     end
 
-    %w(get post patch delete).each do |method|
+    %w(post patch delete).each do |method|
       send("#{method}", '/cars') { return status 400 }
     end
     put '/cars' do
@@ -31,11 +31,11 @@ module CarPooling
     post '/journey' do
       return status 400 if invalid_json_header
       journey = @json_payload
-      return status 400 if !journey || !validate_journey(journey)
+      return status 400 if !journey || !validate_journey(journey) || Journey.find_by_waiting_group_id(journey['id'])
 
       CreateJourneyService.perform(
         waiting_group_id:journey['id'],
-        seats:journey['people']
+        people:journey['people']
       )
       status 200
     end
@@ -69,6 +69,24 @@ module CarPooling
       return 404 if journey.nil?
 
       render_json(200, journey.to_json)
+    end
+
+    get '/cars' do
+      return 404 unless Sinatra::Base.development?
+      render_json(200, Car.all.map{|el| {id:el.id, seats:el.seats} }.to_json)
+    end
+
+    get '/journeys' do
+      return 404 unless Sinatra::Base.development?
+      response = Journey.all.each.map do |k,v|
+        {
+          waiting_group_id: v.waiting_group_id,
+          people: v.people,
+          car_id: v.car.id,
+        }
+      end
+
+      render_json(200, response.to_json)
     end
   end
 end

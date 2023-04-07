@@ -3,9 +3,19 @@ class FinishJourneyService
     mutex = Mutex.new
     mutex.lock
     journey = Journey.find_by_waiting_group_id(waiting_group_id)
+
     return 'not found' unless journey
-    car = Car.find(journey[:car_id])
-    car[:seats] += journey[:seats]
+
+    car = journey.car
+
+    old_queue = CarQueue.get_by_seats(car.seats)
+    old_queue.remove_car(car)
+
+    car.seats += journey.people
+
+    new_queue = CarQueue.get_by_seats(car.seats)
+    new_queue.append(car)
+
     Journey.delete(waiting_group_id)
     mutex.unlock
   end
