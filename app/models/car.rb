@@ -2,49 +2,54 @@ require 'concurrent'
 
 class Car
   @@cars = ::Concurrent::Array.new
+  @@car_queues = ::Concurrent::Hash.new
+  attr_accessor :id, :seats, :current_node
 
-  def self.create(id:, seats:)
-    entity = { id:id, seats:seats }
-    @@cars << entity
-    entity
+  def initialize(id:, seats:)
+    @id = id
+    @seats = seats
   end
 
-  def self.all
-    @@cars
-  end
+  class << self
+    def create(id:, seats:)
+      car = new(id:id, seats:seats)
+      @@cars << car
 
-  def self.reset_cars(cars:nil)
-    destroy_all
-    insert_all(cars) if cars
-  end
+      unshift_to_car_index_by_seats(car:car)
+      car
+    end
 
-  def self.insert_all(cars)
-    symbolyzed_cars = cars.map { |car| car.transform_keys(&:to_sym) }
-    @@cars += symbolyzed_cars
-  end
+    def all
+      @@cars
+    end
 
-  def self.count
-    @@cars.length
-  end
+    def reset_cars(cars:nil)
+      destroy_all
+      insert_all(cars) if cars
+    end
 
-  def self.destroy_all
-    @@cars = ::Concurrent::Array.new
-  end
+    def insert_all(cars)
+      cars.each do |car|
+        create(id: car['id'], seats: car['seats'])
+      end
+    end
 
-  def self.exact_find_by_seats(seats:)
-    @@cars.find { |car| car[:seats] == seats }
-  end
+    def count
+      @@cars.length
+    end
 
-  def self.find_by_seats(seats:)
-    #TODO: This method calls for optimization. We should have cars sorted by seats(i..e.: indexed somehow, just like
-    # we dould do with a database. Searches in a real DB could be much better and include conditions like finding
-    # the car with the smallest Car.last_idle_at value in order to reduce driver idle time.)
-    exact_find = exact_find_by_seats(seats:seats)
-    return exact_find if exact_find
-    @@cars.find { |car| car[:seats] > seats }
-  end
+    def destroy_all
+      CarQueues.clear
+      @@cars = ::Concurrent::Array.new
+    end
 
-  def self.find(id)
-    @@cars.find { |car| car[:id] == id }
+    def unshift_to_car_index_by_seats(car:nil , car_node:nil)
+      seats = car_node ? car_node.value.seats : car.seats
+      get_car_queue_by_seats(seats).unshift(car:car, car_node:car_node)
+    end
+
+    def get_car_queue_by_seats(seats)
+      CarQueues.get_queue_by_seats(seats)
+    end
   end
 end

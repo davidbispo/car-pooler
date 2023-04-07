@@ -1,0 +1,57 @@
+version: "3"
+services:
+  api:
+    tty: true
+    command: bundle exec rackup --host 0.0.0.0 -p 9092 api.ru
+    stdin_open: true
+    build:
+      context: '.'
+    depends_on:
+      - elasticsearch
+      - apm-server
+      - kibana
+    ports:
+      - "9092:9092"
+    environment:
+      - RACK_ENV=development
+      - ELASTIC_APM_CONFIG_FILE=config/app_elastic_apm.yml
+  proxy:
+    tty: true
+    command: bundle exec rackup --host 0.0.0.0 -p 9091 proxy.ru
+    stdin_open: true
+    build:
+      context: '.'
+    depends_on:
+      - elasticsearch
+      - apm-server
+      - kibana
+    ports:
+      - "9091:9091"
+    environment:
+      - RACK_ENV=development
+      - ELASTIC_APM_CONFIG_FILE=config/proxy_elastic_apm.yml
+      - PERFORMANCE_TESTING=false
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.0
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    environment:
+      - discovery.type=single-node
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.17.0
+    ports:
+      - "5601:5601"
+    links:
+      - elasticsearch
+    depends_on:
+      - elasticsearch
+  apm-server:
+    image: docker.elastic.co/apm/apm-server:7.17.0
+    ports:
+      - "8200:8200"
+    depends_on:
+      - elasticsearch
+    links:
+      - elasticsearch
+      - kibana

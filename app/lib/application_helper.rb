@@ -2,7 +2,6 @@ module ApplicationHelper
   def reset_application
     Journey.destroy_all
     Car.destroy_all
-    CarPoolingQueueProcess.clear_queue
   end
 
   #validate parameter inputs

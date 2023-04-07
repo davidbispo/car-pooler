@@ -8,4 +8,4 @@ RUN gem install bundler
 RUN bundle install
 COPY . .
 EXPOSE 9091
-CMD ["bundle", "exec", "puma", "-p", "9091", "-e", "production"]
+CMD ["bundle", "exec", "puma", "-C", "config/puma.rb", "-p", "9091", "-e", "production"]

@@ -2,7 +2,9 @@ require_relative '../../spec_helper'
 require_relative "../../../app/api"
 require_relative '../../../app/models/journey'
 require_relative '../../../app/models/car'
-require_relative '../../../app/lib/car_pooling_queue'
+require_relative '../../../app/models/car_queues'
+require_relative '../../../app/models/car_queue_linked_list'
+require_relative '../../../app/models/car_queue_linked_list_node'
 
 RSpec.describe 'POST /cars: create cars' do
   def app
@@ -25,7 +27,7 @@ RSpec.describe 'POST /cars: create cars' do
       end
 
       it 'expects cars to be on the DB' do
-        expect(Car.all).to match(payload)
+        expect(cars_as_hash(Car.all)).to match(payload)
       end
 
       it '2 cars to have been created' do
@@ -46,7 +48,7 @@ RSpec.describe 'POST /cars: create cars' do
       end
 
       it 'expects cars to be on the DB' do
-        expect(Car.all).to match(payload)
+        expect(cars_as_hash(Car.all)).to match(payload)
       end
 
       it '2 cars to have been created' do
@@ -82,5 +84,9 @@ RSpec.describe 'POST /cars: create cars' do
         expect(last_response.body).to be_empty
       end
     end
+  end
+
+  def cars_as_hash(cars)
+    cars.map{|car| { id:car.id, seats:car.seats } }
   end
 end

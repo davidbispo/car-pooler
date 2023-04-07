@@ -1,342 +1,258 @@
-## SOLUTION - See Challenge Proposal below
-### 1. Tooling basics
-This Car Pooling API solution is built in Ruby. It uses Sinatra as gateway,
-delegating requests to pure Ruby classes
+## My solution to Cabify's Car Pooling challenge **Revisited**.
 
-To solve the challenge, two "roles" were recognized to be fulfilled
-simultaneously:
+I took this challenge in an interview process with Cabify. The
+challenge imposes the ability to somehow manage
+connections(keep people connected to a server)
+and still make peak capacity. And be able to report who is
+holding connections. Using in-memory storage. Which leads to:
 
-(i) the journey requester, which performs a request and **must** wait 
-for response, (ii) the journey finder, which takes care of finding journeys 
-but should not demand trip resolving in order before the next ones. 
-At the same it should not leave unresolved trips unattended.
+b.being able to manage, hold and account for pending connections.
 
-The application is served using puma(multi-threaded Ruby server) to 
-take advantage of simultaneous connections and multi-thread computing. This 
-allows multiple requesters to wait and the first role to be fulfilled. 
-The second role is fulfilled by running a periodic journey finder implemented 
-using concurrent computation and enforcing Thread safe code for atomic 
-operations.
+a.using shared thread-safe variables variables for storage.
 
-### 2. Serving cars
-Journeys can be created via request and are managed by a queue. Once
-a car is requested, the requested posts to a CarPoolingQueue. The request 
-then sleeps and keeps trying to find a CarFoundNotification 
-for the waiting group. This notification contains a car_id that may carry out 
-the trip.
+b.doing atomic operations in the least possible complexity.
 
-Once the waiting request detects that a car has been found for 
-that waiting group, it atomically registers the journey, subtracts the number
-of seats from the assigned car, removes the notification and 
-returns a 200 status.
+In Ruby, this is particularly interesting for me enough to keep
+this project alive and find a working solution.
 
-### 3. The CarPolling queue
-The queue runs concurrently as a scheduled task, that periodically loops
-through the queue, finds cars, and notifies the awaiting requesters.
+## 1. Getting the app to run
+### 1.1. Running the project
+```
+docker-compose up
+```
+The app should be available on port 9091 at localhost.
 
-It serves cars on a first-come-first-serve(FCFS) order. Once the 
-consumer starts, it assigns cars to customers in order of 
-arrival(i.e.: it loops through the queue). 
-
-However, it would not be fair for example within a queue context, 
-for every customer to need to be served before the next, since we don't
-know how long that could take. As a workaround, the queue stores and skips 
-unresolved waiting groups, retrying them before attempting to solve the 
-next waiting groups, so they get prioritized and don't have to wait for 
-another queue cycle to start to get a journey registered.
-
-Cars are served until they are full(i.e.: until no more sits are available). 
-Cars are served to customers FSFS using optimal fit first: we can't fit 4 
-people in a car with 2-seats. Since the opposite is true, makes sense to try
-to fit groups in the largest possible cars and generate the most journeys 
-possible. If we can't find an exact fit, we find a larger car.
-
-### 4. Thread-safety
-Thread safety is achieved by using Thread-synced(i.e.: Thread-safe) variables 
-implemented by concurrent-ruby. Atomic transactions are performed using Mutual
-Exclusion(Mutex) locks in certain points of the code.
-
-### 4. Rationale behind the tooling/solution
-As the first boundary condition, no databases are allowed. Hence
-storage must be done into process memory or using a file-based
-approach. Since a file-based solution would require loading data
-into the memory anyway, class variables were selected.
-One of the key points was data storage using key pointers(hashes) 
-instead of indexes(arrays) unless no other choice is possible, 
-mainly to avoid array-looping operations.
-
-The second boundary condition is serving customers by arrival order.
-This means that we need something to happen continuously and assign
-cars to customers in order. Practically this has been implemented as a 
-ScheduledTask, scheduled for immediate execution. This task runs 
-in a separate Thread, and will loop through the queue, find cars and 
-post notifications to waiting customers. We use two main abstractions for 
-encapsulation: one for queue state(TimerTask - kinda like a daemon) 
-and another for queue execution(ScheduledTask).
-
-Rack-based applications, such as Sinatra, typically serve using
-multiple threads. Since Ruby threads are allowed to wait and each process
-could range up to 200/300 simultaneous threads, using multi-threading
-requests and making them wait seems like a reasonable choice.
-
-Ruby is my language of choice since it is the one I know most 
-to better solve this challenge. Although I have to admit it is probably not the
-best one. The solution described above could work faster and better on 
-a language like Go, where parallel computing is possible and potentially not
-so much of a hassle. Ruby only allows concurrent computing, implementing a 
-Global Interpreter Lock which interleaves code execution, but presents 
-Thread Safety challenges.
-
-Another caveat is that Ruby implements native threading. However, thread-safe 
-code is rather(according to my research) difficult and lacks implementation 
-standards(i.e.: Promises, ScheduledTasks, TimerTasks, etc...). Consequently,
-using wrappers to assist the creation of Thread safe code is advised.
-Hence I used the concurrent-ruby gem.
-
-By coupling multi-threaded requests that can wait and be resolved
-somehow and a class that acts as a journey finder we can provide:
-(i)trips in order, (ii)prevent the journey finder to keep finding 
-trips if a waiting group still does not have a car available,
-(iii)prevent the customer from waiting and not getting his
-request periodically checked.
-
-### 4. How did I achieve a large number of cars/waiting groups
-
-The tooling was thought end-to-end to be the state of the art on what
-is available on Ruby and uses decoupling abstractions sufficient so that the
-code is changeable given a new set of specifications or an upscale necessity. 
-We use puma to handle requests concurrently, which is basically an obvious 
-choice. Concurrent computing becomes necessary given the problem abstraction 
-that was chosen and a set of abstractions inherently necessary. Hence not much
-choice was given there, only optimization was allowed within the toolkit we
-chose.
-
-Scale assertion was performed using the `performance_tester.rb` snippet(it does
-not look good, I didn't have time to make it look pretty). Using the maximum 
-concurrency limit recommended by ruby(around 200 simultaneous threads), 
-we are capable of resolving(at least on my machine) 500 trips per minute when
-testing in-line. Concurrently we are capable of processing up to 2600 trips
-per minute.
-
-# Car Pooling Service Challenge
-
-Design/implement a system to manage car pooling.
-
-At Cabify we provide the service of taking people from point A to point B.
-So far we have done it without sharing cars with multiple groups of people.
-This is an opportunity to optimize the use of resources by introducing car
-pooling.
-
-You have been assigned to build the car availability service that will be used
-to track the available seats in cars.
-
-Cars have a different amount of seats available, they can accommodate groups of
-up to 4, 5 or 6 people.
-
-People requests cars in groups of 1 to 6. People in the same group want to ride
-on the same car. You can take any group at any car that has enough empty seats
-for them. If it's not possible to accommodate them, they're willing to wait until 
-there's a car available for them. Once a car is available for a group
-that is waiting, they should ride. 
-
-Once they get a car assigned, they will journey until the drop off, you cannot
-ask them to take another car (i.e. you cannot swap them to another car to
-make space for another group).
-
-In terms of fairness of trip order: groups should be served as fast as possible,
-but the arrival order should be kept when possible.
-If group B arrives later than group A, it can only be served before group A
-if no car can serve group A.
-
-For example: a group of 6 is waiting for a car and there are 4 empty seats at
-a car for 6; if a group of 2 requests a car you may take them in the car.
-This may mean that the group of 6 waits a long time,
-possibly until they become frustrated and leave.
-
-## Evaluation rules
-
-This challenge has a partially automated scoring system. This means that before
-it is seen by the evaluators, it needs to pass a series of automated checks
-and scoring.
-
-### Checks
-
-All checks need to pass in order for the challenge to be reviewed.
-
-- The `acceptance` test step in the `.gitlab-ci.yml` must pass in master before you
-submit your solution. We will not accept any solutions that do not pass or omit
-this step. This is a public check that can be used to assert that other tests 
-will run successfully on your solution. **This step needs to run without 
-modification**
-- _"further tests"_ will be used to prove that the solution works correctly. 
-These are not visible to you as a candidate and will be run once you submit 
-the solution
-
-### Scoring
-
-There is a number of scoring systems being run on your solution after it is 
-submitted. It is ok if these do not pass, but they add information for the
-reviewers.
-
-## API
-
-To simplify the challenge and remove language restrictions, this service must
-provide a REST API which will be used to interact with it.
-
-This API must comply with the following contract:
-
-### GET /status
-
-Indicate the service has started up correctly and is ready to accept requests.
-
-Responses:
-
-* **200 OK** When the service is ready to receive requests.
-
-### PUT /cars
-
-Load the list of available cars in the service and remove all previous data
-(reset the application state). This method may be called more than once during
-the life cycle of the service.
-
-**Body** _required_ The list of cars to load.
-
-**Content Type** `application/json`
-
-Sample:
-
-```json
-[
-  {
-    "id": 1,
-    "seats": 4
-  },
-  {
-    "id": 2,
-    "seats": 6
-  }
-]
+### 1.2. Running the test suite
+With the project running, do:
+```
+docker-compose exec api rspec spec
 ```
 
-Responses:
+### 1.3. Monitoring
+I have added elastic-apm to the project to allow trace
+monitoring. You can access Kibana to see the traces on
+port 5601 on localhost.
 
-* **200 OK** When the list is registered correctly.
-* **400 Bad Request** When there is a failure in the request format, expected
-  headers, or the payload can't be unmarshalled.
+## 2. Design attempts considerations
 
-### POST /journey
+This project went through 3 designs(which you can find on
+the older commits) until this one. This readme covers **only**
+the latest(and final) design. Overall the three design schemes
+were:
 
-A group of people requests to perform a journey.
+(i)one more complex and using array queues - which Cabify said no to.
 
-**Body** _required_ The group of people that wants to perform the journey
+It performed connections management (holds connection until a trip is found)
+at the application level. The solution is **ok**, although it didn't perform
+well al(it is documented on `Reamde_Delivery.md` and at the 66c2487 commit,
 
-**Content Type** `application/json`
+(ii)one simpler orchestrating Ruby threads by:
 
-Sample:
+a. Requests post messages including a sleeping thread instance to
+a Thread Pool Executor(concurrent-ruby) class.
 
-```json
-{
-  "id": 1,
-  "people": 4
-}
+b. The Thread pool block finds a car and posts to a Thread-safe
+notifications variable and awake the Thread. We make
+it available for Global Interpreter Lock(GIL) scheduling.
+
+c. As soon as it runs, the thread returns result
+
+This design didn't made it better than a failed POC. Look up
+[Thread pool Execution](https://ruby-concurrency.github.io/concurrent-ruby/master/Concurrent/ThreadPoolExecutor.html)
+and [Stopping Ruby Threads](https://ruby-doc.org/core-2.5.0/Thread.html#method-c-stop).
+
+(iii) This design, which relies on (a) keeping low latency and
+(b) using a Puma & Sinatra proxy to manage connections and
+separate business logic from connection management. It is detailed
+on **Item 5**.
+
+## 3. Latency Design Calculations
+```
+latency = nrequests / time_range
 ```
 
-Responses:
+The requirement is for the app to work with 100k ~ 500k cars.
+We assume the app generates sufficient trips
+somewhere around that same order of magnitude.
 
-* **200 OK** or **202 Accepted** When the group is registered correctly
-* **400 Bad Request** When there is a failure in the request format or the
-  payload can't be unmarshalled.
+> ncars = ntrips = nrequests = 200_000
 
-### POST /dropoff
+Assuming the design number of requests to be solved in
+say, **5 minutes:**
+```
+200_000 / (60*5) = 666RPS
+```
+This is a **very high** value. In a quick sensitivity analysis, this
+is somewhere around double the Requests per Second
+(RPS) of the largest payment processing service in Latin America
+until now...during a Black Friday... processing in more than a
+dozen countries with several fleets of instances per country, so...
 
-A group of people requests to be dropped off. Whether they traveled or not.
+We probably won't get there...
+Hence it was decided that at least 350 TPS **should** be way
+more than satisfactory to be processed by a single process.
 
-**Body** _required_ A form with the group ID, such that `ID=X`
-
-**Content Type** `application/x-www-form-urlencoded`
-
-Responses:
-
-* **200 OK** or **204 No Content** When the group is unregistered correctly.
-* **404 Not Found** When the group is not to be found.
-* **400 Bad Request** When there is a failure in the request format or the
-  payload can't be unmarshalled.
-
-### POST /locate
-
-Given a group ID such that `ID=X`, return the car the group is traveling
-with, or no car if they are still waiting to be served.
-
-**Body** _required_ A url encoded form with the group ID such that `ID=X`
-
-**Content Type** `application/x-www-form-urlencoded`
-
-**Accept** `application/json`
-
-Responses:
-
-* **200 OK** With the car as the payload when the group is assigned to a car. See below for the expected car representation 
-```json
-  {
-    "id": 1,
-    "seats": 4
-  }
+Finally, the design latency should be in ms:
+```
+350 TPS = 1000 ms / max_design_latency
+max_design_latency = 2.86 ms
 ```
 
-* **204 No Content** When the group is waiting to be assigned to a car.
-* **404 Not Found** When the group is not to be found.
-* **400 Bad Request** When there is a failure in the request format or the
-  payload can't be unmarshalled.
+## 4. Tooling basics
+This Car Pooling API solution is built in Ruby. It uses Sinatra as
+API gateway, delegating requests to Ruby classes.
 
-## Tooling
+The application is served using Puma. Storage is made in-memory
+using Thread-safe class variables.
 
-At Cabify, we use Gitlab and Gitlab CI for our backend development work. 
-In this repo you may find a [.gitlab-ci.yml](./.gitlab-ci.yml) file which
-contains some tooling that would simplify the setup and testing of the
-deliverable. This testing can be enabled by simply uncommenting the final
-acceptance stage. Note that the image build should be reproducible within
-the CI environment.
+## 5. Serving cars
+### Final Design
 
-Additionally, you will find a basic Dockerfile which you could use a
-baseline, be sure to modify it as much as needed, but keep the exposed port
-as is to simplify the testing.
+![Final Design Scheme](final_app_scheme.png "Sequence diagram for the final solution")
 
-:warning: Avoid dependencies and tools that would require changes to the 
-`acceptance` step of [.gitlab-ci.yml](./.gitlab-ci.yml), such as 
-`docker-compose`
+Customers hit the proxy in order to create Journeys. The Proxy
+stores context and calls the API, which serves cars upon request. In case a car is not available it returns a 404 status. The Proxy will attempt
+to find a car every two seconds and will respond accordingly
+as soon as one is found.
 
-:warning: The challenge needs to be self-contained so we can evaluate it. 
-If the language you are using has limitations that block you from solving this 
-challenge without using a database, please document your reasoning in the 
-readme and use an embedded one such as sqlite.
+### Older designs
 
-You are free to use whatever programming language you deem is best to solve the
-problem but please bear in mind we want to see your best!
+The first design for the app failed mainly due to excessive
+complexity around the connection lock and release, which got
+overall latency incompatible with the challenge goals(although
+a non-trivial and quite sophisticated solution).
 
-You can ignore the Gitlab warning "Cabify Challenge has exceeded its pipeline 
-minutes quota," it will not affect your test or the ability to run pipelines on
-Gitlab.
+The second solution basically clogged the Ruby process, leading
+to crashes due to the excessive context switching when multiple
+clients were hanging. Also nice, but too complicated and not
+as effective.
 
-## Requirements
+## 6. The rationale behind the tooling/solution
+There are *THREE* key points:
 
-- The service should be as efficient as possible.
-  It should be able to work reasonably well with at least $`10^4`$ / $`10^5`$ cars / waiting groups.
-  Explain how you did achieve this requirement.
-- You are free to modify the repository as much as necessary to include or remove
-  dependencies, subject to tooling limitations above.
-- Document your decisions using MRs or in this very README adding sections to it,
-  the same way you would be generating documentation for any other deliverable.
-  We want to see how you operate in a quasi real work environment.
+1. Manipulating data structures in such a way that we always have
+   O(1) operations(i.e.: no transversion).
 
-## Feedback
+We store cars on hash maps where the keys represent available seats and values are Linked Lists are used as queues(smaller complexity on shift and unshift is leveraged).
 
-In Cabify, we really appreciate your interest and your time. We are highly 
-interested on improving our Challenge and the way we evaluate our candidates. 
-Hence, we would like to beg five more minutes of your time to fill the 
-following survey:
+To find available cars we iterate through the range
+of seats that could serve a trip and find cars from the correspondent LL's, resulting in 6 attempts in the worst case, which keeps the whole operation O(1).
 
-- https://forms.gle/EzPeURspTCLG1q9T7
+2. Separating the business logic from connection management
+   (already detailed in item 2).
 
-Your participation is really important. Thanks for your contribution!
+3. Thread Safety: Using Ruby concurrent-ruby Thread-safe variables
+   & atomic transactions using Mutual Exclusion(Mutex) locks.
 
+#### Additional Notes
+1. Ruby concurrent computing interleaves code execution,
+   leading to hard-to-track bugs and other known issues when there
+   are too many open or hanging contexts.
 
+2. I believe that simpler and more effective solutions could be
+   designed by using languages better suited for (i)inter-process
+   communication, (ii)parallelism, and (iii)multi-core computing,
+   such as Go, Elixir, or Scala.
+
+3. In this solution we beat the requirements using an
+   architectural design rather than language features.
+
+4. A real environment on an API has many other layers that
+   are already optimized somehow for communication. Which
+   makes things unbelievably easier.
+
+## 7. How did I achieve a large number of cars/waiting groups?
+Basically low latency by keeping all operations O(1) and
+separating connection management from the app business logic.
+
+This way we:
+```
+(i)  Allow peak time loads to be properly handled & overall low-latency calls
+(ii) Allow connection handling to be done separately
+without implementing additional threading logic to the Sinatra on the API.
+```
+
+Maximum capacity testing was done using Apache Bench. We managed
+to keep request latency below 2 ms on average. We have some non
+2XX responses due to exhaustion of connection capability by Puma.
+```
+ab -p ./test_payload.txt -T application/json -c 12 -n 100000 -v 1 -l http://127.0.0.1:9091/journey
+with env var
+PERFORMANCE_TESTING=true on docker-compose.yml
+```
+
+```
+Server Software:        
+Server Hostname:        127.0.0.1
+Server Port:            9091
+
+Document Path:          /journey
+Document Length:        Variable
+
+Concurrency Level:      12
+Time taken for tests:   386.119 seconds
+Complete requests:      200000
+Failed requests:        0
+Non-2xx responses:      717
+Total transferred:      34407150 bytes
+Total body sent:        32200000
+HTML transferred:       510 bytes
+Requests per second:    517.97 [#/sec] (mean)
+Time per request:       23.167 [ms] (mean)
+Time per request:       1.931 [ms] (mean, across all concurrent requests)
+Transfer rate:          87.02 [Kbytes/sec] received
+                        81.44 kb/s sent
+                        168.46 kb/s total
+
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0   11 300.0      0   11023
+Processing:     1   12  19.1     10     387
+Waiting:        1   12  19.0      9     387
+Total:          1   23 300.9     10   11246
+```
+
+Using the proxy we get a similar result, not affecting the overall
+performance. The ab benchmark command is the same from above,
+but shooting to port 9091 instead.
+```
+Server Software:        
+Server Hostname:        127.0.0.1
+Server Port:            9091
+
+Document Path:          /journey
+Document Length:        Variable
+
+Concurrency Level:      12
+Time taken for tests:   211.736 seconds
+Complete requests:      100000
+Failed requests:        0
+Total transferred:      17200000 bytes
+Total body sent:        16100000
+HTML transferred:       0 bytes
+Requests per second:    472.29 [#/sec] (mean)
+Time per request:       25.408 [ms] (mean)
+Time per request:       2.117 [ms] (mean, across all concurrent requests)
+Transfer rate:          79.33 [Kbytes/sec] received
+                        74.26 kb/s sent
+                        153.59 kb/s total
+
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0    1  24.5      0    1002
+Processing:     3   24  17.0     22    2213
+Waiting:        3   24  16.9     21    2213
+Total:          3   25  30.2     22    2213
+
+Percentage of the requests served within a certain time (ms)
+  50%     22
+  66%     24
+  75%     26
+  80%     27
+  90%     32
+  95%     37
+  98%     65
+  99%    123
+ 100%   2213 (longest request)
+
+```

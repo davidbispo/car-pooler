@@ -1,0 +1,3 @@
+service_name: 'car-pooling-app'
+server_url: http://apm-server:8200
+secret_token: 'xalalala'

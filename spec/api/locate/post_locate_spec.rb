@@ -1,8 +1,13 @@
 require_relative '../../spec_helper'
 require_relative '../../../app/api'
 require_relative '../../../app/models/journey'
-require_relative '../../../app/lib/car_pooling_queue'
+require_relative '../../../app/models/car'
+require_relative '../../../app/models/car_queues'
+require_relative '../../../app/models/car_queue_linked_list_node'
+require_relative '../../../app/models/car_queue_linked_list'
 require_relative '../../../app/services/locate_journey_service'
+require_relative '../../../app/services/create_journey_service'
+require_relative '../../../app/lib/car_pooling_assigner'
 
 RSpec.describe 'POST /locate: Locate journey' do
   def app
@@ -10,7 +15,7 @@ RSpec.describe 'POST /locate: Locate journey' do
   end
 
   describe 'locate' do
-    let(:new_cars) { [{ "id": 1, "seats": 4 }, { "id": 2, "seats": 6 }] }
+    let(:new_cars) { [{ "id" => 1, "seats" => 4 }, { "id" => 2, "seats" => 6 }] }
     context 'and payload is correct' do
       context 'and trip DOES NOT EXIST' do
         before do
@@ -23,22 +28,11 @@ RSpec.describe 'POST /locate: Locate journey' do
         end
       end
 
-      context 'and trip is waiting' do
-        before do
-          allow(CarPoolingQueue).to receive(:get_queue).and_return({1=>2})
-          post('/locate', {ID: 1}, { 'CONTENT_TYPE' => 'application/x-www-form-urlencoded' })
-        end
-
-        it 'expects a 404' do
-          expect(last_response.status).to eq(204)
-        end
-      end
-
       context 'and trip exists' do
+        let(:trip) { { id: 1, people: 2 } }
         before do
-          Journey.destroy_all
-          Car.reset_cars(cars: new_cars)
-          Journey.create(car_id: 1, waiting_group_id: 1, seats: 2)
+          reset_application(new_cars)
+          CreateJourneyService.perform(waiting_group_id: trip[:id], people: trip[:people])
           post('/locate', {ID: 1}, { 'CONTENT_TYPE' => 'application/x-www-form-urlencoded' })
         end
 
@@ -74,5 +68,10 @@ RSpec.describe 'POST /locate: Locate journey' do
         end
       end
     end
+  end
+
+  def reset_application(new_cars)
+    Journey.destroy_all
+    Car.reset_cars(cars: new_cars)
   end
 end
