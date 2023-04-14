@@ -1,9 +1,14 @@
 require 'sinatra/base'
 require_relative './lib/application_helper'
+require 'elastic-apm'
+$stdout.sync = true
 
 module CarPooling
   class API < Sinatra::Base
+    use ::ElasticAPM::Middleware
     eval(File.read('./config/config.rb'))
+
+    @@next_journey_id = 1
 
     before { parse_json unless @request.content_type != 'application/json' }
 
@@ -31,13 +36,15 @@ module CarPooling
     post '/journey' do
       return status 400 if invalid_json_header
       journey = @json_payload
-      return status 400 if !journey || !validate_journey(journey) || Journey.find_by_waiting_group_id(journey['id'])
+      return status 400 if !journey || !validate_journey(journey) || Journey.find_by_waiting_group_id(@@next_journey_id)
 
-      CreateJourneyService.perform(
-        waiting_group_id:journey['id'],
+      result = CreateJourneyService.perform(
+        waiting_group_id:@@next_journey_id,
         people:journey['people']
       )
-      status 200
+      @@next_journey_id += 1
+      return status 200 if result == 'ok'
+      status 404 if result == 'not_found'
     end
 
     %w(get put patch delete).each do |method|

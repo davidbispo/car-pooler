@@ -3,7 +3,7 @@ require 'concurrent'
 class Car
   @@cars = ::Concurrent::Array.new
   @@car_queues = ::Concurrent::Hash.new
-  attr_accessor :id, :seats
+  attr_accessor :id, :seats, :queue
 
   def initialize(id:, seats:)
     @id = id

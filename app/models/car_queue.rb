@@ -38,9 +38,13 @@ class CarQueue
     seat_numbers_eligible = @@queues.keys.sort.select
     seat_numbers_eligible.each do |nseats|
       next unless nseats >= seats
+      queue = CarQueue.get_by_seats(nseats)
       car_found = queue.shift
-      return car_found if car_found
-      false
+      if car_found
+        car_found.queue = queue
+        return car_found
+      end
+      return false
     end
   end
 end

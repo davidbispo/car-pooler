@@ -2,6 +2,7 @@ require_relative '../../spec_helper'
 require_relative "../../../app/api"
 require_relative '../../../app/models/journey'
 require_relative '../../../app/models/car'
+require_relative '../../../app/models/car_queue'
 require_relative '../../../app/lib/car_pooling_queue'
 
 RSpec.describe 'POST /cars: create cars' do

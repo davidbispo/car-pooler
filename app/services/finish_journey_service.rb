@@ -15,6 +15,7 @@ class FinishJourneyService
 
     new_queue = CarQueue.get_by_seats(car.seats)
     new_queue.append(car)
+    car.queue = new_queue
 
     Journey.delete(waiting_group_id)
     mutex.unlock

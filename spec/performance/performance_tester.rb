@@ -25,7 +25,7 @@ def add_cars(number_of_cars)
   puts "Cars successfully added" if response.code == "200"
 end
 
-add_cars(1_000)
+add_cars(400_000)
 
 def create_journeys(njourneys)
   journeys = []
@@ -72,7 +72,7 @@ def call_journeys_concurrent(njourneys)
     Thread.new do
       url = URI("http://localhost:#{PORT}/journey")
 
-      http = Net::HTTP.new(url.host, url.port);
+      http = Net::HTTP.new(url.host, url.port)
       request = Net::HTTP::Post.new(url)
       request["Content-Type"] = "application/json"
       request.body = JSON.dump({
@@ -81,7 +81,7 @@ def call_journeys_concurrent(njourneys)
       })
       response = http.request(request)
       puts response.code if response.code == '200'
-      puts 'failed' if response.code != '200'
+      puts "failed with #{response.code} with response #{response.body}" if response.code != '200'
     end
   end
   threads.map(&:join)
