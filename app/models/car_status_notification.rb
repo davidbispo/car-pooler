@@ -11,6 +11,8 @@ class CarStatusNotification
   end
 
   def self.notify(waiting_group_id:, car:, code:)
+    mutex = Mutex.new
+    mutex.lock
     payload = Concurrent::Hash.new(0)
     payload.merge!({ "car" => car, "code" => code })
     @@notifications[waiting_group_id] = payload

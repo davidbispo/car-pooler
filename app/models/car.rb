@@ -15,7 +15,7 @@ class Car
       entity = new(id:id, seats:seats)
       @@cars << entity
 
-      get_car_queue_by_seats(seats).append(entity)
+      get_car_queue_by_seats(seats).unshift(entity)
       entity
     end
 
@@ -32,6 +32,7 @@ class Car
       cars.each do |car|
         create(id: car['id'], seats: car['seats'])
       end
+      CarQueues.refresh_seat_list
     end
 
     def count
@@ -39,16 +40,16 @@ class Car
     end
 
     def destroy_all
-      CarQueue.clear
+      CarQueues.clear
       @@cars = ::Concurrent::Array.new
     end
 
-    def append_to_car_index_by_seats(car:)
-      get_car_queue_by_seats(car.seats).append(car)
+    def append_to_car_index_by_seats(data=nil , car_node:)
+      get_car_queue_by_seats(car_node.value.seats).unshift(data=data, car_node:car_node)
     end
 
     def get_car_queue_by_seats(seats)
-      CarQueue.get_by_seats(seats)
+      CarQueues.get_queue_by_seats(seats)
     end
   end
 end

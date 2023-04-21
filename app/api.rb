@@ -13,6 +13,10 @@ module CarPooling
     before { parse_json unless @request.content_type != 'application/json' }
 
     get '/status' do
+      byebug
+      running_threads = Thread.list.select {|thread| thread.status == "run"}.count
+      sleeping_threads = Thread.list.select {|thread| thread.status == "sleep"}.count
+      puts "running #{running_threads} threads running and #{sleeping_threads} sleeping"
       return { status: "ok" }.to_json
     end
 
@@ -43,8 +47,8 @@ module CarPooling
         people:journey['people']
       )
       @@next_journey_id += 1
-      return status 200 if result == 'ok'
-      status 404 if result == 'not_found'
+      return status 200 if result
+      status 404
     end
 
     %w(get put patch delete).each do |method|
@@ -93,6 +97,11 @@ module CarPooling
         }
       end
 
+      render_json(200, response.to_json)
+    end
+
+    get '/journeys' do
+      byebug
       render_json(200, response.to_json)
     end
   end

@@ -28,7 +28,7 @@ class Journey
     end
 
     def destroy_all
-      @@journeys = {}
+      @@journeys = Concurrent::Hash.new
     end
   end
 end
